@@ -1,8 +1,9 @@
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <config>
-    <status>active</status> <!-- iPlayer status, can be maintenance, disabled or null -->
-    <version_required>Wii 1.0.12</version_required> <!-- iPlayer's required version -->
-    <status_message></status_message> <!-- Status message (shows if status is maintenance or disabled) -->
-    <preload_swf>fonts</preload_swf> <!-- SWFs to preload, should NOT include WiiiPlayer -->
-    <main_swf>WiiiPlayer</main_swf> <!-- Main swf file, should always be WiiiPlayer -->
+    <host>dysonperley.pythonanywhere.com</host>
+    <status>active</status>
+    <version_required>Wii 1.0.12</version_required>
+    <status_message></status_message>
+    <preload_swf>fonts</preload_swf>
+    <main_swf>WiiiPlayer</main_swf>
 </config>
