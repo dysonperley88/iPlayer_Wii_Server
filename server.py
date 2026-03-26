@@ -1,54 +1,66 @@
-# WiiiPlayer SERVER
-
 from __future__ import print_function
 import requests as reqs
-from flask import Flask, Response, Request, redirect, send_from_directory, send_file, request
+from flask import Flask, Response, send_from_directory, send_file, request
 import os
-import ssl
-from wsgiref.simple_server import WSGIRequestHandler
 import xml.etree.ElementTree as ET
 
-tree = ET.parse("config.xml")
+# --- FIX: absolute path for config.xml ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "config.xml")
+
+tree = ET.parse(CONFIG_PATH)
 root = tree.getroot()
 
-IPLAYER_HOST = root.find("host").text
-IPLAYER_STATUS = root.find("status").text
-IPLAYER_VERSION_REQUIRED = root.find("version_required").text
-IPLAYER_PORT = root.find("port").text
-STATUS_MSG = root.find("status_message").text
-PRELOAD_SWF = root.find("preload_swf").text
-MAIN_APP = root.find("main_swf").text
+# --- SAFE XML GETTER ---
+def get_xml_value(tag, default=""):
+    el = root.find(tag)
+    return el.text if el is not None else default
+
+IPLAYER_HOST = get_xml_value("host", "dysonperley.pythonanywhere.com")
+IPLAYER_STATUS = get_xml_value("status", "active")
+IPLAYER_VERSION_REQUIRED = get_xml_value("version_required", "Wii 1.0.12")
+STATUS_MSG = get_xml_value("status_message", "")
+PRELOAD_SWF = get_xml_value("preload_swf", "fonts")
+MAIN_APP = get_xml_value("main_swf", "WiiiPlayer")
 
 app = Flask(__name__)
-WII_IPLAYER = MAIN_APP+".swf"
+WII_IPLAYER = MAIN_APP + ".swf"
 
+# --- LOG REQUESTS ---
 @app.before_request
 def log():
     print(f"{request.method}: {request.path}, Headers: {dict(request.headers)}")
 
+# --- VERSION FILE ---
 @app.route("/version.txt")
 def versionCheckFile():
     VERSION_CONTENTS = (
-        f"versionRequired={IPLAYER_VERSION_REQUIRED}&status={IPLAYER_STATUS}&statusMessage={STATUS_MSG}&mainApplication={MAIN_APP}&preloadFiles={PRELOAD_SWF}"
+        f"versionRequired={IPLAYER_VERSION_REQUIRED}"
+        f"&status={IPLAYER_STATUS}"
+        f"&statusMessage={STATUS_MSG}"
+        f"&mainApplication={MAIN_APP}"
+        f"&preloadFiles={PRELOAD_SWF}"
     )
 
-    return Response(VERSION_CONTENTS, mimetype="application/x-www-form-urlencoded") # can also be text/plain, but according to adobe docs, it should be application/x-www-form-urlencoded
+    return Response(VERSION_CONTENTS, mimetype="application/x-www-form-urlencoded")
 
+# --- MAIN PLAYER ---
 @app.route("/WiiiPlayer.swf")
 def WiiiPlayer():
-    return send_from_directory("static", WII_IPLAYER, mimetype="application/x-shockwave-flash")
+    return send_from_directory(os.path.join(BASE_DIR, "static"), WII_IPLAYER, mimetype="application/x-shockwave-flash")
 
-@app.route("/proxy.asp", methods=["GET", "POST"]) # used?
+# --- PROXY ---
+@app.route("/proxy.asp", methods=["GET", "POST"])
 def WiiiPlayerProxy():
     url = request.args.get("url")
     key = request.args.get("key")
 
     if not url:
         return "Bad request", 400
-    
-    if not key or key != "nstnstnst": # constant
+
+    if not key or key != "nstnstnst":
         return "Unauthorized", 403
-    
+
     try:
         res = reqs.get(url, stream=True)
 
@@ -60,11 +72,12 @@ def WiiiPlayerProxy():
     except reqs.RequestException as e:
         return f"Error trying to fetch URI: {e}", 500
 
-
+# --- FONTS ---
 @app.route("/fonts.swf")
 def iPlayerFonts():
-    return send_from_directory("static", "fonts.swf", mimetype="application/x-shockwave-flash")
+    return send_from_directory(os.path.join(BASE_DIR, "static"), "fonts.swf", mimetype="application/x-shockwave-flash")
 
+# --- CROSSDOMAIN ---
 @app.route("/crossdomain.xml")
 def crossdomain():
     policy = """<?xml version="1.0"?>
@@ -74,13 +87,7 @@ def crossdomain():
 </cross-domain-policy>"""
     return Response(policy, mimetype="application/xml")
 
+# --- THUMBNAILS ---
 @app.route("/thumbnails.xml")
 def thumbnails_onserver():
-    return send_file("thumbnails.xml")
-
-if __name__ == '__main__':
-    WSGIRequestHandler.protocol_version = "HTTP/1.1"
-
-    print(f"iPlayer Config:\nPreloading: {PRELOAD_SWF}\nStatus Message: {STATUS_MSG}\nRequired version: {IPLAYER_VERSION_REQUIRED}\nMain SWF: {WII_IPLAYER}")
-
-    app.run(host=IPLAYER_HOST, port=IPLAYER_PORT, debug=True)
+    return send_file(os.path.join(BASE_DIR, "thumbnails.xml"))
